@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- iPhone Home Screen icon -->
+    <link rel="apple-touch-icon"
+          sizes="180x180"
+          href="https://tejasv90.github.io/Dashboard/apple-touch-icon.png?v=3">
+
+    <title>Personal Expense Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for tables in dark mode */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 antialiased min-h-screen flex flex-col">
+
+    <header class="bg-slate-800/90 backdrop-blur-md border-b border-slate-700/80 sticky top-0 z-30 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-gradient-to-r from-[#e76366] to-[#8355eb] text-white p-2 rounded-xl shadow-sm flex items-center justify-center">
+                    <i class="fa-solid fa-wallet text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold text-white leading-tight">Expense Tracker</h1>
+                    <p class="text-xs text-slate-400 hidden sm:block">Google Sheets Live Sync (INR ₹)</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <span id="last-updated" class="text-[10px] sm:text-xs text-slate-400 hidden md:inline">Syncing...</span>
+                <button onclick="openConfigModal()" class="inline-flex items-center px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-medium text-slate-300 bg-slate-700/70 hover:bg-slate-700 hover:text-white rounded-lg transition-colors border border-slate-600/50" title="Settings / Sheet URL">
+                    <i class="fa-solid fa-gear sm:mr-1.5"></i>
+                    <span class="hidden sm:inline">Settings</span>
+                </button>
+                <button onclick="loadSheetData()" id="refresh-btn" class="inline-flex items-center px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold text-white bg-gradient-to-r from-[#e76366] to-[#8355eb] hover:opacity-90 rounded-lg shadow-xs transition-all">
+                    <i class="fa-solid fa-rotate-right mr-1.5" id="refresh-icon"></i>
+                    Refresh Data
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
+
+        <!-- Filters & Controls Bar -->
+        <section class="bg-slate-800 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-slate-700/80 shadow-md flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                <!-- Month Selector -->
+                <div class="flex items-center space-x-1.5 bg-slate-900/80 border border-slate-700 rounded-lg px-2.5 py-1.5">
+                    <i class="fa-regular fa-calendar text-[#e76366] text-xs"></i>
+                    <label for="month-select" class="text-xs font-medium text-slate-400">Month:</label>
+                    <select id="month-select" onchange="onMonthChange()" class="bg-transparent text-xs font-semibold text-slate-100 focus:outline-none cursor-pointer">
+                        <option value="" class="bg-slate-800 text-slate-100">Loading...</option>
+                    </select>
+                </div>
+
+                <!-- Category Filter -->
+                <div class="flex items-center space-x-1.5 bg-slate-900/80 border border-slate-700 rounded-lg px-2.5 py-1.5">
+                    <i class="fa-solid fa-tag text-[#8355eb] text-xs"></i>
+                    <label for="category-select" class="text-xs font-medium text-slate-400">Category:</label>
+                    <select id="category-select" onchange="applyFilters()" class="bg-transparent text-xs font-semibold text-slate-100 focus:outline-none cursor-pointer max-w-[110px] sm:max-w-none">
+                        <option value="ALL" class="bg-slate-800 text-slate-100">All Categories</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <!-- Search box -->
+                <div class="relative flex-1 md:w-64">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                        <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                    </span>
+                    <input type="text" id="search-input" oninput="applyFilters()" placeholder="Search remarks..." class="w-full pl-8 pr-3 py-1.5 bg-slate-900/80 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#8355eb]/40 focus:border-[#e76366]">
+                </div>
+                <button onclick="resetFilters()" class="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-700/60 hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap border border-slate-600/50">
+                    Reset
+                </button>
+            </div>
+        </section>
+
+        <!-- Scorecards Section -->
+        <section class="grid grid-cols-2 gap-3 sm:gap-4">
+            <!-- Current Month Scorecard -->
+            <div class="bg-slate-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-slate-700/80 shadow-md relative overflow-hidden flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-2">
+                    <span id="card-curr-label" class="text-xs sm:text-sm font-bold bg-gradient-to-r from-[#e76366] to-[#8355eb] bg-clip-text text-transparent truncate">Current Month</span>
+                    <div class="w-7 h-7 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-r from-[#e76366]/15 to-[#8355eb]/15 border border-[#e76366]/30 flex items-center justify-center text-[#e76366]">
+                        <i class="fa-solid fa-coins text-xs sm:text-sm"></i>
+                    </div>
+                </div>
+                <div>
+                    <h2 id="card-curr-amount" class="text-lg sm:text-3xl font-extrabold text-white tracking-tight">₹0.00</h2>
+                    <p class="text-[10px] sm:text-xs text-slate-400 mt-1">Total spend for selected category/month</p>
+                </div>
+            </div>
+
+            <!-- Previous Month Scorecard -->
+            <div class="bg-slate-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-slate-700/80 shadow-md relative overflow-hidden flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-2">
+                    <span id="card-prev-label" class="text-xs sm:text-sm font-bold text-slate-300 truncate">Previous Month</span>
+                    <div class="w-7 h-7 sm:w-9 sm:h-9 rounded-xl bg-slate-700/60 border border-slate-600/50 flex items-center justify-center text-slate-300">
+                        <i class="fa-solid fa-clock-rotate-left text-xs sm:text-sm"></i>
+                    </div>
+                </div>
+                <div>
+                    <h2 id="card-prev-amount" class="text-lg sm:text-3xl font-extrabold text-white tracking-tight">₹0.00</h2>
+                    <p class="text-[10px] sm:text-xs text-slate-400 mt-1">Total spend for comparison month</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="bg-slate-800 rounded-xl sm:rounded-2xl border border-slate-700/80 shadow-md overflow-hidden">
+            <div class="p-3 sm:p-5 border-b border-slate-700/80 flex items-center justify-between">
+                <div>
+                    <h3 class="text-xs sm:text-base font-bold text-white">Category Comparison</h3>
+                    <p class="text-[9px] sm:text-xs text-slate-400">Comparing <span id="table-curr-label" class="font-semibold text-slate-200">-</span> vs <span id="table-prev-label" class="font-semibold text-slate-200">-</span></p>
+                </div>
+                <span class="text-[9px] sm:text-xs font-semibold px-2.5 py-1 bg-gradient-to-r from-[#e76366]/15 to-[#8355eb]/15 text-[#e76366] border border-[#e76366]/30 rounded-full">Monthly Breakdown</span>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-[10px] sm:text-sm whitespace-nowrap">
+                    <thead>
+                        <tr class="bg-slate-900/60 border-b border-slate-700 text-slate-400 text-[9px] sm:text-xs uppercase tracking-wider font-semibold">
+                            <th class="px-2 py-2 sm:px-6 sm:py-3.5 align-top">Category</th>
+                            <th id="th-curr-month" class="px-2 py-2 sm:px-6 sm:py-3.5 text-right align-top">Current</th>
+                            <th id="th-prev-month" class="px-2 py-2 sm:px-6 sm:py-3.5 text-right align-top">Previous</th>
+                            <th class="px-2 py-2 sm:px-6 sm:py-3.5 text-right align-top">% Change</th>
+                        </tr>
+                    </thead>
+                    <tbody id="comparison-table-body" class="divide-y divide-slate-700/60 text-slate-200">
+                        <tr><td colspan="4" class="px-6 py-8 text-center text-slate-400 align-top">Loading category data...</td></tr>
+                    </tbody>
+                    <tfoot id="comparison-table-foot" class="bg-slate-900/80 border-t border-slate-700 font-semibold text-white">
+                        <!-- Total row inserted dynamically -->
+                    </tfoot>
+                </table>
+            </div>
+        </section>
+
+        <section class="bg-slate-800 rounded-xl sm:rounded-2xl border border-slate-700/80 shadow-md overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-slate-700/80 flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm sm:text-base font-bold text-white">Transaction History</h3>
+                </div>
+                <span id="tx-count-badge" class="text-[10px] sm:text-xs font-semibold px-2.5 py-1 bg-slate-700/60 text-slate-300 rounded-full border border-slate-600/50">0 tx</span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs sm:text-sm whitespace-nowrap">
+                    <thead>
+                        <tr class="bg-slate-900/60 border-b border-slate-700 text-slate-400 text-[10px] sm:text-xs uppercase tracking-wider font-semibold">
+                            <th class="px-3 py-2.5 sm:px-6 sm:py-3.5 w-24 sm:w-36 align-top">Date</th>
+                            <th class="px-3 py-2.5 sm:px-6 sm:py-3.5 w-28 sm:w-44 align-top">Category</th>
+                            <th class="px-3 py-2.5 sm:px-6 sm:py-3.5 text-right w-24 sm:w-32 align-top">Amount</th>
+                            <th class="px-4 py-2.5 sm:px-6 sm:py-3.5 align-top">Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactions-table-body" class="divide-y divide-slate-700/60 text-slate-200">
+                        <tr><td colspan="4" class="px-6 py-8 text-center text-slate-400 align-top">No transactions loaded.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="mt-auto bg-slate-900 border-t border-slate-800 py-3 text-center text-xs text-slate-400">
+        &copy;Dashboards by Tejas 2026
+    </footer>
+
+    <!-- Settings Modal -->
+    <div id="config-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-700 space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-base font-bold text-white">Dashboard Settings</h3>
+                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <p class="text-xs text-slate-400">Configure your published Google Sheet CSV URL below.</p>
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Published CSV URL</label>
+                <input type="text" id="sheet-url-input" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#ff5757]/40 focus:border-[#ff5757]">
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="closeConfigModal()" class="px-4 py-2 text-xs font-medium text-slate-300 bg-slate-700/60 hover:bg-slate-700 rounded-lg">Cancel</button>
+                <button onclick="saveConfig()" class="px-4 py-2 text-xs font-semibold text-white bg-gradient-to-r from-[#e76366] to-[#8355eb] hover:opacity-90 rounded-lg shadow-xs">Save & Reload</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let DEFAULT_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBaArVHaD6eK8eIi_4TmDkT5zXN8RpVkIBmLvTiBkNYpWwoGmnNMjT_J2rSUdjI9xssp8f0KT9tw47/pub?output=csv";
+        
+        let rawTransactions = [];
+        let filteredTransactions = [];
+        let availableMonths = [];
+        let selectedMonth = '';
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedUrl = localStorage.getItem('expense_sheet_url');
+            if (savedUrl) {
+                DEFAULT_CSV_URL = savedUrl;
+            }
+            document.getElementById('sheet-url-input').value = DEFAULT_CSV_URL;
+            loadSheetData();
+        });
+
+        function openConfigModal() {
+            document.getElementById('config-modal').classList.remove('hidden');
+        }
+
+        function closeConfigModal() {
+            document.getElementById('config-modal').classList.add('hidden');
+        }
+
+        function saveConfig() {
+            const urlInput = document.getElementById('sheet-url-input').value.trim();
+            if (urlInput) {
+                DEFAULT_CSV_URL = urlInput;
+                localStorage.setItem('expense_sheet_url', DEFAULT_CSV_URL);
+                closeConfigModal();
+                loadSheetData();
+            }
+        }
+
+        async function loadSheetData() {
+            const refreshIcon = document.getElementById('refresh-icon');
+            refreshIcon.classList.add('fa-spin');
+            document.getElementById('last-updated').textContent = 'Refreshing...';
+
+            try {
+                const cacheBuster = `&_cb=${Date.now()}&_r=${Math.random()}&_nc=1`;
+                let fetchUrl = DEFAULT_CSV_URL;
+                if (!fetchUrl.includes('output=csv')) {
+                    if (fetchUrl.includes('pubhtml')) {
+                        fetchUrl = fetchUrl.replace('pubhtml', 'pub?output=csv');
+                    } else if (!fetchUrl.includes('pub?')) {
+                        fetchUrl += (fetchUrl.includes('?') ? '&' : '?') + 'output=csv';
+                    }
+                }
+                const finalUrl = fetchUrl + cacheBuster;
+
+                const response = await fetch(finalUrl, { cache: 'no-store' });
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const csvText = await response.text();
+
+                parseCSV(csvText);
+                initMonthDropdown();
+                initCategoryDropdown();
+                applyFilters();
+
+                const now = new Date();
+                document.getElementById('last-updated').textContent = `Updated: ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+            } catch (error) {
+                console.error("Error loading CSV:", error);
+                document.getElementById('last-updated').textContent = 'Sync failed';
+                document.getElementById('comparison-table-body').innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-rose-500">Failed to load data. Please check your published CSV URL in settings.</td></tr>`;
+            } finally {
+                refreshIcon.classList.remove('fa-spin');
+            }
+        }
+
+        function parseCSV(text) {
+            const lines = text.split(/\r\n|\n/);
+            rawTransactions = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                const row = parseCSVRow(line);
+                if (row.length < 4) continue;
+
+                const dateStr = (row[0] || '').trim();
+                const category = (row[2] || 'Uncategorized').trim();
+                const amountRaw = (row[3] || '0').trim();
+                const remarks = (row[4] || '').trim();
+
+                const parsedDate = parseDDMMYYYY(dateStr);
+                const amount = parseAmount(amountRaw);
+
+                if (!parsedDate) continue;
+
+                const year = parsedDate.getFullYear();
+                const month = parsedDate.getMonth() + 1;
+                const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
+
+                const dayFormatted = String(parsedDate.getDate()).padStart(2, '0');
+                const monthShort = parsedDate.toLocaleString('default', { month: 'short' });
+                const dateFormattedFull = `${dayFormatted} ${monthShort} ${year}`;
+
+                rawTransactions.push({
+                    date: parsedDate,
+                    dateFormattedFull: dateFormattedFull,
+                    yearMonth: yearMonth,
+                    category: category || 'Uncategorized',
+                    amount: isNaN(amount) ? 0 : amount,
+                    remarks: remarks
+                });
+            }
+
+            rawTransactions.sort((a, b) => b.date - a.date);
+        }
+
+        function parseCSVRow(text) {
+            let result = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < text.length; i++) {
+                let char = text[i];
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current);
+            return result.map(item => item.replace(/^"|"$/g, '').trim());
+        }
+
+        function parseDDMMYYYY(dateStr) {
+            if (!dateStr) return null;
+            let clean = dateStr.replace(/[^0-9]/g, '');
+            if (clean.length === 8) {
+                let d = parseInt(clean.substring(0, 2), 10);
+                let m = parseInt(clean.substring(2, 4), 10) - 1;
+                let y = parseInt(clean.substring(4, 8), 10);
+                let dateObj = new Date(y, m, d);
+                if (!isNaN(dateObj.getTime())) return dateObj;
+            }
+            let fallback = new Date(dateStr);
+            return isNaN(fallback.getTime()) ? null : fallback;
+        }
+
+        function parseAmount(amtStr) {
+            if (!amtStr) return 0;
+            let clean = amtStr.replace(/[^0-9.\-]/g, '');
+            let val = parseFloat(clean);
+            return isNaN(val) ? 0 : val;
+        }
+
+        function formatCurrency(num) {
+            return '₹' + num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function initMonthDropdown() {
+            const monthSet = new Set(rawTransactions.map(t => t.yearMonth));
+            availableMonths = Array.from(monthSet).sort().reverse();
+
+            const select = document.getElementById('month-select');
+            select.innerHTML = '';
+
+            if (availableMonths.length === 0) {
+                select.innerHTML = `<option value="">No months found</option>`;
+                selectedMonth = '';
+                return;
+            }
+
+            availableMonths.forEach(ym => {
+                const opt = document.createElement('option');
+                opt.value = ym;
+                opt.textContent = formatYearMonthLabel(ym);
+                select.appendChild(opt);
+            });
+
+            if (!selectedMonth || !availableMonths.includes(selectedMonth)) {
+                selectedMonth = availableMonths[0];
+            }
+            select.value = selectedMonth;
+        }
+
+        function formatYearMonthLabel(ym) {
+            const [y, m] = ym.split('-');
+            const date = new Date(parseInt(y), parseInt(m) - 1, 1);
+            return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+        }
+
+        function initCategoryDropdown() {
+            const catSet = new Set(rawTransactions.map(t => t.category).filter(c => c.toLowerCase() !== 'uncategorized'));
+            const categories = Array.from(catSet).sort();
+
+            const select = document.getElementById('category-select');
+            const currentVal = select.value;
+            select.innerHTML = `<option value="ALL" class="bg-slate-800 text-slate-100">All Categories</option>`;
+
+            categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                opt.className = 'bg-slate-800 text-slate-100';
+                select.appendChild(opt);
+            });
+
+            if (categories.includes(currentVal)) {
+                select.value = currentVal;
+            } else {
+                select.value = 'ALL';
+            }
+        }
+
+        function onMonthChange() {
+            selectedMonth = document.getElementById('month-select').value;
+            applyFilters();
+        }
+
+        function resetFilters() {
+            document.getElementById('category-select').value = 'ALL';
+            document.getElementById('search-input').value = '';
+            if (availableMonths.length > 0) {
+                selectedMonth = availableMonths[0];
+                document.getElementById('month-select').value = selectedMonth;
+            }
+            applyFilters();
+        }
+
+        function applyFilters() {
+            selectedMonth = document.getElementById('month-select').value;
+            const selectedCategory = document.getElementById('category-select').value;
+            const searchQuery = document.getElementById('search-input').value.toLowerCase();
+
+            filteredTransactions = rawTransactions.filter(t => {
+                const matchesMonth = (!selectedMonth || t.yearMonth === selectedMonth);
+                const matchesCategory = (selectedCategory === 'ALL' || t.category === selectedCategory);
+                const matchesSearch = (!searchQuery || t.remarks.toLowerCase().includes(searchQuery) || t.category.toLowerCase().includes(searchQuery));
+                return matchesMonth && matchesCategory && matchesSearch;
+            });
+
+            renderDashboard();
+        }
+
+        function renderDashboard() {
+            if (!selectedMonth) return;
+
+            const [y, m] = selectedMonth.split('-').map(Number);
+            const prevDate = new Date(y, m - 2, 1);
+            const prevYear = prevDate.getFullYear();
+            const prevMonthNum = prevDate.getMonth() + 1;
+            const prevMonthKey = `${prevYear}-${String(prevMonthNum).padStart(2, '0')}`;
+
+            const currLabel = formatYearMonthLabel(selectedMonth);
+            const prevLabel = formatYearMonthLabel(prevMonthKey);
+
+            document.getElementById('card-curr-label').textContent = currLabel;
+            document.getElementById('card-prev-label').textContent = prevLabel;
+
+            const selectedCategory = document.getElementById('category-select').value;
+            
+            const currMonthAll = rawTransactions.filter(t => t.yearMonth === selectedMonth);
+            const prevMonthAll = rawTransactions.filter(t => t.yearMonth === prevMonthKey);
+
+            const currTotal = currMonthAll
+                .filter(t => selectedCategory === 'ALL' || t.category === selectedCategory)
+                .reduce((sum, t) => sum + t.amount, 0);
+
+            const prevTotal = prevMonthAll
+                .filter(t => selectedCategory === 'ALL' || t.category === selectedCategory)
+                .reduce((sum, t) => sum + t.amount, 0);
+
+            document.getElementById('card-curr-amount').textContent = formatCurrency(currTotal);
+            document.getElementById('card-prev-amount').textContent = formatCurrency(prevTotal);
+
+            renderComparisonTable(selectedMonth, prevMonthKey, currLabel, prevLabel);
+            renderTransactionsTable();
+        }
+
+        function renderComparisonTable(currMonthKey, prevMonthKey, currLabel, prevLabel) {
+            document.getElementById('th-curr-month').textContent = currLabel;
+            document.getElementById('th-prev-month').textContent = prevLabel;
+            document.getElementById('table-curr-label').textContent = currLabel;
+            document.getElementById('table-prev-label').textContent = prevLabel;
+
+            const currTransactions = rawTransactions.filter(t => t.yearMonth === currMonthKey);
+            const prevTransactions = rawTransactions.filter(t => t.yearMonth === prevMonthKey);
+
+            const categories = Array.from(new Set([
+                ...currTransactions.map(t => t.category),
+                ...prevTransactions.map(t => t.category)
+            ])).filter(c => c.toLowerCase() !== 'uncategorized');
+
+            let categoryRows = [];
+            let totalCurr = 0;
+            let totalPrev = 0;
+
+            categories.forEach(cat => {
+                const currSum = currTransactions.filter(t => t.category === cat).reduce((s, t) => s + t.amount, 0);
+                const prevSum = prevTransactions.filter(t => t.category === cat).reduce((s, t) => s + t.amount, 0);
+                
+                totalCurr += currSum;
+                totalPrev += prevSum;
+
+                const absChange = currSum - prevSum;
+                let pctChange = 0;
+                if (prevSum > 0) {
+                    pctChange = (absChange / prevSum) * 100;
+                } else if (currSum > 0) {
+                    pctChange = 100;
+                }
+
+                categoryRows.push({
+                    category: cat,
+                    curr: currSum,
+                    prev: prevSum,
+                    pctChange: pctChange
+                });
+            });
+
+            const customOrder = [
+                'Food',
+                'Grocery',
+                'Shopping/Entertainment',
+                'Medical',
+                'Investments',
+                'Transportation',
+                'Fuel',
+                'Repairs and Maintenance',
+                'Others'
+            ];
+
+            categoryRows.sort((a, b) => {
+                let indexA = customOrder.indexOf(a.category);
+                let indexB = customOrder.indexOf(b.category);
+                if (indexA === -1) indexA = 999;
+                if (indexB === -1) indexB = 999;
+                if (indexA !== indexB) {
+                    return indexA - indexB;
+                }
+                return b.curr - a.curr;
+            });
+
+            const tbody = document.getElementById('comparison-table-body');
+            tbody.innerHTML = '';
+
+            if (categoryRows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-slate-400 align-top">No category data found for these months.</td></tr>`;
+                document.getElementById('comparison-table-foot').innerHTML = '';
+                return;
+            }
+
+            categoryRows.forEach(row => {
+                const absChange = row.curr - row.prev;
+                let badgeClass = 'text-slate-300 bg-slate-700/60 border border-slate-600/50';
+                let iconHtml = '<i class="fa-solid fa-minus mr-0.5"></i>';
+
+                if (absChange > 0) {
+                    badgeClass = 'text-rose-400 bg-rose-500/10 border border-rose-500/30';
+                    iconHtml = '<i class="fa-solid fa-arrow-trend-up mr-0.5 text-rose-400"></i>';
+                } else if (absChange < 0) {
+                    badgeClass = 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30';
+                    iconHtml = '<i class="fa-solid fa-arrow-trend-down mr-0.5 text-emerald-400"></i>';
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-700/40 transition-colors";
+                tr.innerHTML = `
+                    <td class="px-2 py-2 sm:px-6 sm:py-3.5 font-medium text-slate-100 truncate max-w-[110px] sm:max-w-none align-top" title="${row.category}">${row.category}</td>
+                    <td class="px-2 py-2 sm:px-6 sm:py-3.5 text-right font-semibold text-white align-top">${formatCurrency(row.curr)}</td>
+                    <td class="px-2 py-2 sm:px-6 sm:py-3.5 text-right text-slate-300 align-top">${formatCurrency(row.prev)}</td>
+                    <td class="px-2 py-2 sm:px-6 sm:py-3.5 text-right align-top">
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] sm:text-xs font-semibold ${badgeClass}">
+                            ${iconHtml} ${row.pctChange > 0 && row.prev > 0 ? '+' : ''}${row.pctChange.toFixed(1)}%
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const totalAbsChange = totalCurr - totalPrev;
+            let totalPctChange = totalPrev > 0 ? (totalAbsChange / totalPrev) * 100 : (totalCurr > 0 ? 100 : 0);
+
+            let totalBadgeClass = 'text-slate-300 bg-slate-700/60 border border-slate-600/50';
+            let totalIconHtml = '<i class="fa-solid fa-minus mr-0.5"></i>';
+            if (totalAbsChange > 0) {
+                totalBadgeClass = 'text-rose-400 bg-rose-500/10 border border-rose-500/30';
+                totalIconHtml = '<i class="fa-solid fa-arrow-trend-up mr-0.5 text-rose-400"></i>';
+            } else if (totalAbsChange < 0) {
+                totalBadgeClass = 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30';
+                totalIconHtml = '<i class="fa-solid fa-arrow-trend-down mr-0.5 text-emerald-400"></i>';
+            }
+
+            const tfoot = document.getElementById('comparison-table-foot');
+            tfoot.innerHTML = `
+                <tr>
+                    <td class="px-2 py-2 sm:px-6 sm:py-3.5 text-white font-bold align-top">Total</td>
+                    <td class="px-2 py-2 sm:px-6 sm:py-3.5 text-right text-white font-bold align-top">${formatCurrency(totalCurr)}</td>
+                    <td class="px-2 py-2 sm:px-6 sm:py-3.5 text-right text-white font-bold align-top">${formatCurrency(totalPrev)}</td>
+                    <td class="px-2 py-2 sm:px-6 sm:py-3.5 text-right align-top">
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] sm:text-xs font-semibold ${totalBadgeClass}">
+                            ${totalIconHtml} ${totalPctChange > 0 && totalPrev > 0 ? '+' : ''}${totalPctChange.toFixed(1)}%
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }
+
+        function renderTransactionsTable() {
+            const tbody = document.getElementById('transactions-table-body');
+            document.getElementById('tx-count-badge').textContent = `${filteredTransactions.length} tx`;
+            tbody.innerHTML = '';
+
+            if (filteredTransactions.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="px-3 py-6 text-center text-slate-400 align-top">No transactions match your current filters.</td></tr>`;
+                return;
+            }
+
+            const sortedTx = [...filteredTransactions].sort((a, b) => b.date - a.date);
+
+            sortedTx.forEach(t => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-700/40 transition-colors";
+
+                tr.innerHTML = `
+                    <td class="px-3 py-2.5 sm:px-6 sm:py-3.5 text-slate-300 font-mono text-[11px] sm:text-sm whitespace-nowrap w-24 sm:w-36 align-top">${t.dateFormattedFull}</td>
+                    <td class="px-3 py-2.5 sm:px-6 sm:py-3.5 whitespace-nowrap w-28 sm:w-44 align-top">
+                        <span class="bg-slate-900/90 border border-slate-600/80 text-white px-2.5 py-1 rounded-md text-[11px] sm:text-sm inline-block truncate max-w-[120px] sm:max-w-none align-middle shadow-sm relative overflow-hidden" title="${t.category}">
+                            <span class="absolute inset-0 bg-gradient-to-r from-[#e76366] to-[#8355eb] opacity-30"></span>
+                            <span class="relative z-10 text-white font-medium">${t.category}</span>
+                        </span>
+                    </td>
+                    <td class="px-3 py-2.5 sm:px-6 sm:py-3.5 text-right font-bold text-white text-[11px] sm:text-sm whitespace-nowrap w-24 sm:w-32 align-top">${formatCurrency(t.amount)}</td>
+                    <td class="px-4 py-2.5 sm:px-6 sm:py-3.5 text-slate-300 text-xs sm:text-sm whitespace-nowrap align-top">${t.remarks || '<span class="text-slate-500 italic">-</span>'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>
